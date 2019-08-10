@@ -110,15 +110,17 @@ view model =
     let
         isReturnDateDisabled =
             model.type_ == OneWay
-
-        isBookButtonDisabled =
-            not (isValid model)
     in
-    div [ style "text-align" "center" ]
-        [ flightTypeView model.type_
-        , dateInputView False ChangedStartDate model.startDate
-        , dateInputView isReturnDateDisabled ChangedReturnDate model.returnDate
-        , button [ disabled isBookButtonDisabled ] [ text "Book" ]
+    div []
+        [ div
+            [ style "display" "flex"
+            , style "flex-direction" "column"
+            ]
+            [ flightTypeView model.type_
+            , dateInputView False ChangedStartDate model.startDate
+            , dateInputView isReturnDateDisabled ChangedReturnDate model.returnDate
+            , buttonView model
+            ]
         ]
 
 
@@ -143,3 +145,13 @@ dateInputView isDisabled msg date =
             ]
             []
         ]
+
+
+buttonView : Model -> Html Msg
+buttonView model =
+    let
+        isBookButtonDisabled =
+            not (isValid model)
+    in
+    div []
+        [ button [ disabled isBookButtonDisabled ] [ text "Book" ] ]
