@@ -1,12 +1,14 @@
 module Crud exposing (main)
 
+-- import Debug
+
 import Browser
-import Crud.Contact as Contact exposing (Contact)
+import Crud.Contact as Contact exposing (Contact, Name, Surname)
+import Crud.Db as Db exposing (DB)
 import Crud.Style as Style
-import Debug
 import Html exposing (Html, button, div, input, label, option, select, text)
-import Html.Attributes exposing (multiple, style, value)
-import Html.Events exposing (onClick)
+import Html.Attributes exposing (disabled, multiple, style, value)
+import Html.Events exposing (onClick, onInput)
 
 
 main : Program () Model Msg
@@ -18,13 +20,40 @@ main =
 -- MODEL
 
 
+type alias Filter =
+    Maybe Surname
+
+
+matchContact : Filter -> Contact -> Bool
+matchContact filter_ contact_ =
+    let
+        match surname =
+            String.startsWith (Contact.surnameToString surname) (Contact.getSurname contact_)
+    in
+    filter_
+        |> Maybe.map match
+        |> Maybe.withDefault True
+
+
+type alias ContactsDB =
+    DB Contact
+
+
 type alias Model =
-    Int
+    { name : Name
+    , surname : Surname
+    , filter : Filter
+    , contactsDB : ContactsDB
+    }
 
 
 init : Model
 init =
-    0
+    { name = Contact.name ""
+    , surname = Contact.surname ""
+    , contactsDB = Db.db
+    , filter = Nothing
+    }
 
 
 
@@ -32,14 +61,43 @@ init =
 
 
 type Msg
-    = Increment
+    = Noop
+    | ChangedName Name
+    | ChangedSurname Surname
+    | ChangedFilter (Maybe Surname)
+    | ClickedCreate
 
 
 update : Msg -> Model -> Model
 update msg model =
     case msg of
-        Increment ->
-            model + 1
+        Noop ->
+            model
+
+        ChangedName name ->
+            { model | name = name }
+
+        ChangedSurname surname ->
+            { model | surname = surname }
+
+        ClickedCreate ->
+            onClickedCreate model
+
+        ChangedFilter filter ->
+            { model | filter = filter }
+
+
+onClickedCreate : Model -> Model
+onClickedCreate model =
+    let
+        newContact =
+            Contact.id >> Contact.contact model.name model.surname
+    in
+    { model
+        | name = Contact.name ""
+        , surname = Contact.surname ""
+        , contactsDB = Db.insert newContact model.contactsDB
+    }
 
 
 
@@ -53,43 +111,57 @@ view model =
             [ Style.display "flex"
             , style "flex-direction" "row"
             ]
-            [ contactsView
-            , newContactView
+            [ contactsView model.filter model.contactsDB
+            , newContactView model.name model.surname
             ]
-        , controlsView
+        , controlsView model
         ]
 
 
-contactsView =
+contactsView : Filter -> ContactsDB -> Html Msg
+contactsView filter contactsDB =
     div
         [ style "margin" "0 1em 1em 0"
         ]
         [ filterView
-        , contactsListView []
+        , contactsListView contactsDB filter
         ]
 
 
+filterView : Html Msg
 filterView =
+    let
+        msg text =
+            if text == "" then
+                ChangedFilter Nothing
+
+            else
+                ChangedFilter (Just (Contact.surname text))
+    in
     div []
         [ label [] [ text "Filter prefix:" ]
-        , input [] []
+        , input [ onInput msg ] []
         ]
 
 
-contactsListView : List Contact -> Html msg
-contactsListView contacts =
+contactsListView : ContactsDB -> Filter -> Html msg
+contactsListView contactsDB filter =
     let
         fullName contact =
-            Contact.surname contact ++ ", " ++ Contact.name contact
+            Contact.getSurname contact
+                ++ ", "
+                ++ Contact.getName contact
 
         contactView contact =
-            option [ value (Contact.id contact) ]
+            option [ value (Contact.getId contact) ]
                 [ text (fullName contact)
                 ]
 
         options =
-            contacts
-                |> List.map contactView
+            contactsDB
+                |> Db.filter (matchContact filter)
+                |> Db.map contactView
+                |> Db.rows
     in
     select
         [ multiple True
@@ -98,37 +170,55 @@ contactsListView contacts =
         options
 
 
-newContactView =
+newContactView : Name -> Surname -> Html Msg
+newContactView name surname =
     div []
-        [ inputView "Name" "John"
-        , inputView "Surname" "Romba"
+        [ inputView
+            (Contact.name >> ChangedName)
+            "Name"
+            (Contact.nameToString name)
+        , inputView
+            (Contact.surname >> ChangedSurname)
+            "Surname"
+            (Contact.surnameToString surname)
         ]
 
 
-inputView : String -> String -> Html msg
-inputView name value_ =
+inputView : (String -> Msg) -> String -> String -> Html Msg
+inputView msg name value_ =
     div []
         [ label
             [ Style.display "inline-block"
             , Style.width "4em"
             ]
             [ text (name ++ ":") ]
-        , input [ value value_ ] []
+        , input
+            [ value value_
+            , onInput msg
+            ]
+            []
         ]
 
 
-controlsView =
+controlsView : Model -> Html Msg
+controlsView model =
     let
-        btn text_ =
+        btn msg enabled text_ =
             button
                 [ style "padding-right" "1em"
+                , disabled (not enabled)
+                , onClick msg
                 ]
                 [ text text_ ]
+
+        canCreate =
+            (Contact.nameToString model.name /= "")
+                && (Contact.surnameToString model.surname /= "")
     in
     div []
-        [ btn "Create"
-        , btn "Update"
-        , btn "Delete"
+        [ btn ClickedCreate canCreate "Create"
+        , btn Noop True "Update"
+        , btn Noop True "Delete"
         ]
 
 

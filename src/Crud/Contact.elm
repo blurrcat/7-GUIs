@@ -1,47 +1,87 @@
-module Crud.Contact exposing (Contact, contact, id, name, surname)
+module Crud.Contact exposing
+    ( Contact
+    , Name
+    , Surname
+    , contact
+    , getId
+    , getName
+    , getSurname
+    , id
+    , idToString
+    , name
+    , nameToString
+    , surname
+    , surnameToString
+    )
 
 
-type alias Name =
-    String
+type Name
+    = Name String
 
 
-type alias Surname =
-    String
+type Surname
+    = Surname String
 
 
-type ContactId
-    = ContactId String
+type Id
+    = Id String
 
 
 type alias Contact =
-    { id : ContactId
+    { id : Id
     , name : Name
     , surname : Surname
     }
 
 
-contact : String -> Name -> Surname -> Contact
-contact stringId name_ surname_ =
-    { id = ContactId stringId
+id : String -> Id
+id text =
+    Id text
+
+
+idToString : Id -> String
+idToString (Id text) =
+    text
+
+
+name : String -> Name
+name text =
+    Name text
+
+
+nameToString : Name -> String
+nameToString (Name text) =
+    text
+
+
+surname : String -> Surname
+surname text =
+    Surname text
+
+
+surnameToString : Surname -> String
+surnameToString (Surname text) =
+    text
+
+
+contact : Name -> Surname -> Id -> Contact
+contact name_ surname_ id_ =
+    { id = id_
     , name = name_
     , surname = surname_
     }
 
 
-id : Contact -> String
-id contact_ =
-    let
-        (ContactId stringId) =
-            contact_.id
-    in
-    stringId
+getId : Contact -> String
+getId contact_ =
+    idToString contact_.id
 
 
-name : Contact -> Name
-name contact_ =
-    contact_.name
+getName : Contact -> String
+getName contact_ =
+    nameToString contact_.name
 
 
-surname : Contact -> Surname
-surname contact_ =
-    contact_.surname
+getSurname : Contact -> String
+getSurname contact_ =
+    surnameToString contact_.surname
