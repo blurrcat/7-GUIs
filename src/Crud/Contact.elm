@@ -1,5 +1,6 @@
 module Crud.Contact exposing
     ( Contact
+    , Id
     , Name
     , Surname
     , contact

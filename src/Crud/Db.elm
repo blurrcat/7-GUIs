@@ -1,4 +1,4 @@
-module Crud.Db exposing (DB, db, filter, insert, map, rows)
+module Crud.Db exposing (DB, db, delete, filter, insert, map, rows)
 
 
 type alias DB a =
@@ -28,12 +28,19 @@ map fn db_ =
 
 
 filter : (a -> Bool) -> DB a -> DB a
-filter f db_ =
+filter match db_ =
     { db
-        | rows = List.filter f db_.rows
+        | rows = List.filter match db_.rows
     }
 
 
 rows : DB a -> List a
 rows db_ =
     db_.rows
+
+
+delete : (a -> Bool) -> DB a -> DB a
+delete match db_ =
+    { db
+        | rows = List.filter (not << match) db_.rows
+    }

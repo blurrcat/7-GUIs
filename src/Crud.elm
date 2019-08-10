@@ -1,11 +1,10 @@
 module Crud exposing (main)
 
--- import Debug
-
 import Browser
 import Crud.Contact as Contact exposing (Contact, Name, Surname)
 import Crud.Db as Db exposing (DB)
 import Crud.Style as Style
+import Debug
 import Html exposing (Html, button, div, input, label, option, select, text)
 import Html.Attributes exposing (disabled, multiple, style, value)
 import Html.Events exposing (onClick, onInput)
@@ -20,19 +19,33 @@ main =
 -- MODEL
 
 
-type alias Filter =
-    Maybe Surname
+type alias Filter a =
+    Maybe a
 
 
-matchContact : Filter -> Contact -> Bool
-matchContact filter_ contact_ =
+apply : (a -> Bool) -> Filter a -> Maybe Bool
+apply match filter_ =
+    Maybe.map match filter_
+
+
+matchBySurname : Filter Surname -> Contact -> Maybe Bool
+matchBySurname filter_ contact_ =
     let
         match surname =
-            String.startsWith (Contact.surnameToString surname) (Contact.getSurname contact_)
+            String.startsWith
+                (Contact.surnameToString surname)
+                (Contact.getSurname contact_)
     in
-    filter_
-        |> Maybe.map match
-        |> Maybe.withDefault True
+    apply match filter_
+
+
+matchById : Filter Contact.Id -> Contact -> Maybe Bool
+matchById filter_ contact_ =
+    let
+        match id =
+            Contact.getId contact_ == Contact.idToString id
+    in
+    apply match filter_
 
 
 type alias ContactsDB =
@@ -42,8 +55,9 @@ type alias ContactsDB =
 type alias Model =
     { name : Name
     , surname : Surname
-    , filter : Filter
+    , filter : Filter Surname
     , contactsDB : ContactsDB
+    , selectedId : Filter Contact.Id
     }
 
 
@@ -53,6 +67,7 @@ init =
     , surname = Contact.surname ""
     , contactsDB = Db.db
     , filter = Nothing
+    , selectedId = Nothing
     }
 
 
@@ -66,6 +81,8 @@ type Msg
     | ChangedSurname Surname
     | ChangedFilter (Maybe Surname)
     | ClickedCreate
+    | ClickedDelete
+    | SelectedContact (Maybe Contact.Id)
 
 
 update : Msg -> Model -> Model
@@ -83,8 +100,14 @@ update msg model =
         ClickedCreate ->
             onClickedCreate model
 
+        ClickedDelete ->
+            onClickedDelete model
+
         ChangedFilter filter ->
             { model | filter = filter }
+
+        SelectedContact id ->
+            { model | selectedId = id }
 
 
 onClickedCreate : Model -> Model
@@ -97,6 +120,16 @@ onClickedCreate model =
         | name = Contact.name ""
         , surname = Contact.surname ""
         , contactsDB = Db.insert newContact model.contactsDB
+    }
+
+
+onClickedDelete : Model -> Model
+onClickedDelete model =
+    { model
+        | contactsDB =
+            Db.delete
+                (matchById model.selectedId >> Maybe.withDefault False)
+                model.contactsDB
     }
 
 
@@ -118,7 +151,7 @@ view model =
         ]
 
 
-contactsView : Filter -> ContactsDB -> Html Msg
+contactsView : Filter Surname -> ContactsDB -> Html Msg
 contactsView filter contactsDB =
     div
         [ style "margin" "0 1em 1em 0"
@@ -144,28 +177,36 @@ filterView =
         ]
 
 
-contactsListView : ContactsDB -> Filter -> Html msg
+contactsListView : ContactsDB -> Filter Surname -> Html Msg
 contactsListView contactsDB filter =
     let
-        fullName contact =
-            Contact.getSurname contact
-                ++ ", "
-                ++ Contact.getName contact
-
         contactView contact =
             option [ value (Contact.getId contact) ]
                 [ text (fullName contact)
                 ]
 
+        fullName contact =
+            Contact.getSurname contact
+                ++ ", "
+                ++ Contact.getName contact
+
         options =
             contactsDB
-                |> Db.filter (matchContact filter)
+                |> Db.filter (matchBySurname filter >> Maybe.withDefault True)
                 |> Db.map contactView
                 |> Db.rows
+
+        msg text =
+            if text == "" then
+                SelectedContact Nothing
+
+            else
+                SelectedContact (Just (Contact.id text))
     in
     select
         [ multiple True
         , Style.width "100%"
+        , onInput msg
         ]
         options
 
@@ -214,11 +255,14 @@ controlsView model =
         canCreate =
             (Contact.nameToString model.name /= "")
                 && (Contact.surnameToString model.surname /= "")
+
+        canDelete =
+            model.selectedId /= Nothing
     in
     div []
         [ btn ClickedCreate canCreate "Create"
         , btn Noop True "Update"
-        , btn Noop True "Delete"
+        , btn ClickedDelete canDelete "Delete"
         ]
 
 
