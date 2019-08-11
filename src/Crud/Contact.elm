@@ -1,14 +1,10 @@
 module Crud.Contact exposing
     ( Contact
-    , Id
     , Name
     , Surname
     , contact
-    , getId
     , getName
     , getSurname
-    , id
-    , idToString
     , name
     , nameToString
     , surname
@@ -24,25 +20,10 @@ type Surname
     = Surname String
 
 
-type Id
-    = Id String
-
-
 type alias Contact =
-    { id : Id
-    , name : Name
+    { name : Name
     , surname : Surname
     }
-
-
-id : String -> Id
-id text =
-    Id text
-
-
-idToString : Id -> String
-idToString (Id text) =
-    text
 
 
 name : String -> Name
@@ -65,24 +46,18 @@ surnameToString (Surname text) =
     text
 
 
-contact : Name -> Surname -> Id -> Contact
-contact name_ surname_ id_ =
-    { id = id_
-    , name = name_
+contact : Name -> Surname -> Contact
+contact name_ surname_ =
+    { name = name_
     , surname = surname_
     }
 
 
-getId : Contact -> String
-getId contact_ =
-    idToString contact_.id
-
-
-getName : Contact -> String
+getName : Contact -> Name
 getName contact_ =
-    nameToString contact_.name
+    contact_.name
 
 
-getSurname : Contact -> String
+getSurname : Contact -> Surname
 getSurname contact_ =
-    surnameToString contact_.surname
+    contact_.surname

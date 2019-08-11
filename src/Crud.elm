@@ -3,8 +3,8 @@ module Crud exposing (main)
 import Browser
 import Crud.Contact as Contact exposing (Contact, Name, Surname)
 import Crud.Db as Db exposing (DB)
+import Crud.Db.Row as Row exposing (Row)
 import Crud.Style as Style
-import Debug
 import Html exposing (Html, button, div, input, label, option, select, text)
 import Html.Attributes exposing (disabled, multiple, style, value)
 import Html.Events exposing (onClick, onInput)
@@ -23,33 +23,12 @@ type alias Filter a =
     Maybe a
 
 
-apply : (a -> Bool) -> Filter a -> Maybe Bool
-apply match filter_ =
-    Maybe.map match filter_
-
-
-matchBySurname : Filter Surname -> Contact -> Maybe Bool
-matchBySurname filter_ contact_ =
-    let
-        match surname =
-            String.startsWith
-                (Contact.surnameToString surname)
-                (Contact.getSurname contact_)
-    in
-    apply match filter_
-
-
-matchById : Filter Contact.Id -> Contact -> Maybe Bool
-matchById filter_ contact_ =
-    let
-        match id =
-            Contact.getId contact_ == Contact.idToString id
-    in
-    apply match filter_
-
-
 type alias ContactsDB =
     DB Contact
+
+
+type alias ContactRow =
+    Row Contact
 
 
 type alias Model =
@@ -57,7 +36,8 @@ type alias Model =
     , surname : Surname
     , filter : Filter Surname
     , contactsDB : ContactsDB
-    , selectedId : Filter Contact.Id
+    , selectedId : Maybe Row.Id
+    , selectedContact : Maybe ContactRow
     }
 
 
@@ -68,6 +48,7 @@ init =
     , contactsDB = Db.db
     , filter = Nothing
     , selectedId = Nothing
+    , selectedContact = Nothing
     }
 
 
@@ -76,21 +57,18 @@ init =
 
 
 type Msg
-    = Noop
-    | ChangedName Name
+    = ChangedName Name
     | ChangedSurname Surname
     | ChangedFilter (Maybe Surname)
     | ClickedCreate
     | ClickedDelete
-    | SelectedContact (Maybe Contact.Id)
+    | ClickedUpdate
+    | SelectedContact (Maybe Row.Id)
 
 
 update : Msg -> Model -> Model
 update msg model =
     case msg of
-        Noop ->
-            model
-
         ChangedName name ->
             { model | name = name }
 
@@ -103,23 +81,41 @@ update msg model =
         ClickedDelete ->
             onClickedDelete model
 
+        ClickedUpdate ->
+            onClickedUpdate model
+
         ChangedFilter filter ->
             { model | filter = filter }
 
         SelectedContact id ->
-            { model | selectedId = id }
+            onSelectedContact id model
 
 
 onClickedCreate : Model -> Model
 onClickedCreate model =
     let
         newContact =
-            Contact.id >> Contact.contact model.name model.surname
+            Contact.contact model.name model.surname
     in
     { model
         | name = Contact.name ""
         , surname = Contact.surname ""
         , contactsDB = Db.insert newContact model.contactsDB
+        , selectedId = Nothing
+    }
+
+
+onClickedUpdate : Model -> Model
+onClickedUpdate model =
+    let
+        newContact =
+            Contact.contact model.name model.surname
+    in
+    { model
+        | contactsDB =
+            model.selectedId
+                |> Maybe.map (\id -> Db.update id newContact model.contactsDB)
+                |> Maybe.withDefault model.contactsDB
     }
 
 
@@ -127,10 +123,34 @@ onClickedDelete : Model -> Model
 onClickedDelete model =
     { model
         | contactsDB =
-            Db.delete
-                (matchById model.selectedId >> Maybe.withDefault False)
-                model.contactsDB
+            model.selectedId
+                |> Maybe.map (\id -> Db.delete id model.contactsDB)
+                |> Maybe.withDefault model.contactsDB
+        , selectedId = Nothing
     }
+
+
+onSelectedContact : Maybe Row.Id -> Model -> Model
+onSelectedContact maybeId model =
+    let
+        maybeRow =
+            maybeId
+                |> Maybe.andThen (\id -> Db.get id model.contactsDB)
+    in
+    case maybeRow of
+        Nothing ->
+            { model
+                | selectedId = maybeId
+                , name = Contact.name ""
+                , surname = Contact.surname ""
+            }
+
+        Just row ->
+            { model
+                | selectedId = maybeId
+                , name = Contact.getName row.data
+                , surname = Contact.getSurname row.data
+            }
 
 
 
@@ -178,30 +198,43 @@ filterView =
 
 
 contactsListView : ContactsDB -> Filter Surname -> Html Msg
-contactsListView contactsDB filter =
+contactsListView db filter =
     let
-        contactView contact =
-            option [ value (Contact.getId contact) ]
-                [ text (fullName contact)
+        contactView row =
+            option [ value (getIdAsString row) ]
+                [ text (fullName row.data)
                 ]
 
         fullName contact =
-            Contact.getSurname contact
+            getSurnameAsString contact
                 ++ ", "
-                ++ Contact.getName contact
+                ++ getNameAsString contact
+
+        db_ =
+            case filter of
+                Nothing ->
+                    db
+
+                Just surname ->
+                    let
+                        match contact =
+                            String.startsWith
+                                (Contact.surnameToString surname)
+                                (getSurnameAsString contact)
+                    in
+                    Db.filter match db
 
         options =
-            contactsDB
-                |> Db.filter (matchBySurname filter >> Maybe.withDefault True)
-                |> Db.map contactView
+            db_
                 |> Db.rows
+                |> List.map contactView
 
         msg text =
             if text == "" then
                 SelectedContact Nothing
 
             else
-                SelectedContact (Just (Contact.id text))
+                SelectedContact (Just (Row.id text))
     in
     select
         [ multiple True
@@ -252,19 +285,41 @@ controlsView model =
                 ]
                 [ text text_ ]
 
+        contactExists =
+            Db.exists (Contact.contact model.name model.surname) model.contactsDB
+
         canCreate =
             (Contact.nameToString model.name /= "")
                 && (Contact.surnameToString model.surname /= "")
+                && not contactExists
 
-        canDelete =
+        isSelected =
             model.selectedId /= Nothing
+
+        canUpdate =
+            canCreate && isSelected
     in
     div []
         [ btn ClickedCreate canCreate "Create"
-        , btn Noop True "Update"
-        , btn ClickedDelete canDelete "Delete"
+        , btn ClickedUpdate canUpdate "Update"
+        , btn ClickedDelete isSelected "Delete"
         ]
 
 
 
 -- HELPERS
+
+
+getSurnameAsString : Contact -> String
+getSurnameAsString =
+    Contact.getSurname >> Contact.surnameToString
+
+
+getNameAsString : Contact -> String
+getNameAsString =
+    Contact.getName >> Contact.nameToString
+
+
+getIdAsString : Row Contact -> String
+getIdAsString =
+    .id >> Row.idToString
