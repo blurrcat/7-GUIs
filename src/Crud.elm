@@ -43,8 +43,8 @@ type alias Model =
 
 init : Model
 init =
-    { name = Contact.name ""
-    , surname = Contact.surname ""
+    { name = ""
+    , surname = ""
     , contactsDB = Db.db
     , filter = Nothing
     , selectedId = Nothing
@@ -98,8 +98,8 @@ onClickedCreate model =
             Contact.contact model.name model.surname
     in
     { model
-        | name = Contact.name ""
-        , surname = Contact.surname ""
+        | name = ""
+        , surname = ""
         , contactsDB = Db.insert newContact model.contactsDB
         , selectedId = Nothing
     }
@@ -141,15 +141,15 @@ onSelectedContact maybeId model =
         Nothing ->
             { model
                 | selectedId = maybeId
-                , name = Contact.name ""
-                , surname = Contact.surname ""
+                , name = ""
+                , surname = ""
             }
 
         Just row ->
             { model
                 | selectedId = maybeId
-                , name = Contact.getName row.data
-                , surname = Contact.getSurname row.data
+                , name = Contact.name row.data
+                , surname = Contact.surname row.data
             }
 
 
@@ -189,7 +189,7 @@ filterView =
                 ChangedFilter Nothing
 
             else
-                ChangedFilter (Just (Contact.surname text))
+                ChangedFilter (Just text)
     in
     div []
         [ label [] [ text "Filter prefix:" ]
@@ -206,9 +206,9 @@ contactsListView db filter =
                 ]
 
         fullName contact =
-            getSurnameAsString contact
+            Contact.surname contact
                 ++ ", "
-                ++ getNameAsString contact
+                ++ Contact.name contact
 
         db_ =
             case filter of
@@ -216,13 +216,9 @@ contactsListView db filter =
                     db
 
                 Just surname ->
-                    let
-                        match contact =
-                            String.startsWith
-                                (Contact.surnameToString surname)
-                                (getSurnameAsString contact)
-                    in
-                    Db.filter match db
+                    db
+                        |> Db.filter
+                            (Contact.surname >> String.startsWith surname)
 
         options =
             db_
@@ -247,14 +243,8 @@ contactsListView db filter =
 newContactView : Name -> Surname -> Html Msg
 newContactView name surname =
     div []
-        [ inputView
-            (Contact.name >> ChangedName)
-            "Name"
-            (Contact.nameToString name)
-        , inputView
-            (Contact.surname >> ChangedSurname)
-            "Surname"
-            (Contact.surnameToString surname)
+        [ inputView ChangedName "Name" name
+        , inputView ChangedSurname "Surname" surname
         ]
 
 
@@ -289,8 +279,8 @@ controlsView model =
             Db.exists (Contact.contact model.name model.surname) model.contactsDB
 
         canCreate =
-            (Contact.nameToString model.name /= "")
-                && (Contact.surnameToString model.surname /= "")
+            (model.name /= "")
+                && (model.surname /= "")
                 && not contactExists
 
         isSelected =
@@ -308,16 +298,6 @@ controlsView model =
 
 
 -- HELPERS
-
-
-getSurnameAsString : Contact -> String
-getSurnameAsString =
-    Contact.getSurname >> Contact.surnameToString
-
-
-getNameAsString : Contact -> String
-getNameAsString =
-    Contact.getName >> Contact.nameToString
 
 
 getIdAsString : Row Contact -> String
