@@ -19,11 +19,16 @@ main =
 -- MODEL
 
 
-type alias Filter a =
-    Maybe a
+type alias Model =
+    { name : Name
+    , surname : Surname
+    , surnameFilter : SurnameFilter
+    , contactDB : ContactDB
+    , selectedId : Maybe Row.Id
+    }
 
 
-type alias ContactsDB =
+type alias ContactDB =
     DB Contact
 
 
@@ -31,24 +36,17 @@ type alias ContactRow =
     Row Contact
 
 
-type alias Model =
-    { name : Name
-    , surname : Surname
-    , filter : Filter Surname
-    , contactsDB : ContactsDB
-    , selectedId : Maybe Row.Id
-    , selectedContact : Maybe ContactRow
-    }
+type alias SurnameFilter =
+    Maybe Surname
 
 
 init : Model
 init =
     { name = ""
     , surname = ""
-    , contactsDB = Db.db
-    , filter = Nothing
+    , contactDB = Db.db
+    , surnameFilter = Nothing
     , selectedId = Nothing
-    , selectedContact = Nothing
     }
 
 
@@ -59,7 +57,7 @@ init =
 type Msg
     = ChangedName Name
     | ChangedSurname Surname
-    | ChangedFilter (Maybe Surname)
+    | ChangedSurnameFilter SurnameFilter
     | ClickedCreate
     | ClickedDelete
     | ClickedUpdate
@@ -84,8 +82,8 @@ update msg model =
         ClickedUpdate ->
             onClickedUpdate model
 
-        ChangedFilter filter ->
-            { model | filter = filter }
+        ChangedSurnameFilter surnameFilter ->
+            { model | surnameFilter = surnameFilter }
 
         SelectedContact id ->
             onSelectedContact id model
@@ -100,7 +98,7 @@ onClickedCreate model =
     { model
         | name = ""
         , surname = ""
-        , contactsDB = Db.insert newContact model.contactsDB
+        , contactDB = Db.insert newContact model.contactDB
         , selectedId = Nothing
     }
 
@@ -112,20 +110,20 @@ onClickedUpdate model =
             Contact.contact model.name model.surname
     in
     { model
-        | contactsDB =
+        | contactDB =
             model.selectedId
-                |> Maybe.map (\id -> Db.update id newContact model.contactsDB)
-                |> Maybe.withDefault model.contactsDB
+                |> Maybe.map (\id -> Db.update id newContact model.contactDB)
+                |> Maybe.withDefault model.contactDB
     }
 
 
 onClickedDelete : Model -> Model
 onClickedDelete model =
     { model
-        | contactsDB =
+        | contactDB =
             model.selectedId
-                |> Maybe.map (\id -> Db.delete id model.contactsDB)
-                |> Maybe.withDefault model.contactsDB
+                |> Maybe.map (\id -> Db.delete id model.contactDB)
+                |> Maybe.withDefault model.contactDB
         , selectedId = Nothing
     }
 
@@ -135,7 +133,7 @@ onSelectedContact maybeId model =
     let
         maybeRow =
             maybeId
-                |> Maybe.andThen (\id -> Db.get id model.contactsDB)
+                |> Maybe.andThen (\id -> Db.get id model.contactDB)
     in
     case maybeRow of
         Nothing ->
@@ -164,20 +162,20 @@ view model =
             [ Style.display "flex"
             , style "flex-direction" "row"
             ]
-            [ contactsView model.filter model.contactsDB
+            [ contactsView model.surnameFilter model.contactDB
             , newContactView model.name model.surname
             ]
         , controlsView model
         ]
 
 
-contactsView : Filter Surname -> ContactsDB -> Html Msg
-contactsView filter contactsDB =
+contactsView : SurnameFilter -> ContactDB -> Html Msg
+contactsView filter db =
     div
         [ style "margin" "0 1em 1em 0"
         ]
         [ filterView
-        , contactsListView contactsDB filter
+        , contactsListView db filter
         ]
 
 
@@ -186,10 +184,10 @@ filterView =
     let
         msg text =
             if text == "" then
-                ChangedFilter Nothing
+                ChangedSurnameFilter Nothing
 
             else
-                ChangedFilter (Just text)
+                ChangedSurnameFilter (Just text)
     in
     div []
         [ label [] [ text "Filter prefix:" ]
@@ -197,11 +195,13 @@ filterView =
         ]
 
 
-contactsListView : ContactsDB -> Filter Surname -> Html Msg
+contactsListView : ContactDB -> SurnameFilter -> Html Msg
 contactsListView db filter =
     let
         contactView row =
-            option [ value (getIdAsString row) ]
+            option
+                [ value (getIdAsString row)
+                ]
                 [ text (fullName row.data)
                 ]
 
@@ -210,18 +210,9 @@ contactsListView db filter =
                 ++ ", "
                 ++ Contact.name contact
 
-        db_ =
-            case filter of
-                Nothing ->
-                    db
-
-                Just surname ->
-                    db
-                        |> Db.filter
-                            (Contact.surname >> String.startsWith surname)
-
         options =
-            db_
+            db
+                |> applySurnameFilter filter
                 |> Db.rows
                 |> List.map contactView
 
@@ -276,7 +267,7 @@ controlsView model =
                 [ text text_ ]
 
         contactExists =
-            Db.exists (Contact.contact model.name model.surname) model.contactsDB
+            Db.exists (Contact.contact model.name model.surname) model.contactDB
 
         canCreate =
             (model.name /= "")
@@ -300,6 +291,16 @@ controlsView model =
 -- HELPERS
 
 
-getIdAsString : Row Contact -> String
+getIdAsString : ContactRow -> String
 getIdAsString =
     .id >> Row.idToString
+
+
+applySurnameFilter : SurnameFilter -> ContactDB -> ContactDB
+applySurnameFilter filter db =
+    filter
+        |> Maybe.map
+            (\surname ->
+                Db.filter (Contact.surname >> String.startsWith surname) db
+            )
+        |> Maybe.withDefault db
