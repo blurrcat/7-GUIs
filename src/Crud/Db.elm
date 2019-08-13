@@ -1,5 +1,6 @@
 module Crud.Db exposing
     ( DB
+    , Query
     , db
     , delete
     , exists
@@ -11,13 +12,15 @@ module Crud.Db exposing
     , update
     )
 
-import Crud.Db.Row as Row exposing (Row)
-
 
 type alias DB a =
     { seq : Int
-    , rows : List (Row a)
+    , rows : List a
     }
+
+
+type alias Query a =
+    a -> Bool
 
 
 db : DB a
@@ -25,83 +28,65 @@ db =
     { seq = 1, rows = [] }
 
 
-insert : a -> DB a -> DB a
-insert data db_ =
-    let
-        doesExist =
-            exists data db_
-    in
-    if doesExist then
-        db_
+rows : DB a -> List a
+rows =
+    .rows
 
-    else
-        { db
-            | seq = db_.seq + 1
-            , rows = List.append [ Row.row (String.fromInt db_.seq) data ] db_.rows
-        }
+
+insert : (Int -> a) -> DB a -> ( a, DB a )
+insert createRow db_ =
+    let
+        newRow =
+            createRow db_.seq
+    in
+    ( newRow
+    , { db
+        | seq = db_.seq + 1
+        , rows = newRow :: db_.rows
+      }
+    )
 
 
 map : (a -> b) -> DB a -> DB b
 map fn db_ =
     { db
-        | rows = List.map (Row.map fn) db_.rows
+        | rows = List.map fn db_.rows
     }
 
 
-filter : (a -> Bool) -> DB a -> DB a
-filter match db_ =
+filter : Query a -> DB a -> DB a
+filter query db_ =
     { db_
-        | rows = List.filter (Row.match match) db_.rows
+        | rows = List.filter query db_.rows
     }
 
 
-rows : DB a -> List (Row a)
-rows db_ =
-    db_.rows
+delete : Query a -> DB a -> DB a
+delete query =
+    filter (not << query)
 
 
-delete : Row.Id -> DB a -> DB a
-delete id db_ =
-    { db
-        | rows = List.filter (matchById id) db_.rows
-    }
+exists : Query a -> DB a -> Bool
+exists query =
+    .rows
+        >> List.any query
 
 
-exists : a -> DB a -> Bool
-exists data db_ =
-    db_.rows
-        |> List.map .data
-        |> List.member data
+get : Query a -> DB a -> Maybe a
+get query =
+    .rows
+        >> List.filter query
+        >> List.head
 
 
-get : Row.Id -> DB a -> Maybe (Row a)
-get id db_ =
-    db_.rows
-        |> List.filter (matchById id)
-        |> List.head
-
-
-update : Row.Id -> a -> DB a -> DB a
-update id data db_ =
+update : Query a -> a -> DB a -> DB a
+update query data db_ =
     let
         update_ row =
-            if row.id == id then
-                Row id data
+            if query row then
+                data
 
             else
                 row
     in
-    { db_
-        | rows =
-            db_.rows
-                |> List.map update_
-    }
-
-
-
--- HELPERS
-
-
-matchById : Row.Id -> (Row a -> Bool)
-matchById id =
-    .id >> (==) id
+    { db_ | rows = List.map update_ db_.rows }

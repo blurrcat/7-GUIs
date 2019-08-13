@@ -1,4 +1,4 @@
-module Crud.Style exposing (display, width, widthEm)
+module Crud.Style exposing (display, flex, height, width)
 
 import Html exposing (Attribute)
 import Html.Attributes exposing (style)
@@ -9,11 +9,16 @@ width =
     style "width"
 
 
+height : String -> Attribute msg
+height =
+    style "height"
+
+
 display : String -> Attribute msg
 display =
     style "display"
 
 
-widthEm : Float -> Attribute msg
-widthEm em =
-    width (String.fromFloat em ++ "em")
+flex : String -> Attribute msg
+flex =
+    style "flex"

@@ -1,11 +1,17 @@
 module Crud.Contact exposing
     ( Contact
+    , Id
     , Name
     , Surname
     , contact
+    , id
     , name
     , surname
     )
+
+
+type alias Id =
+    String
 
 
 type alias Name =
@@ -19,21 +25,28 @@ type alias Surname =
 type alias Contact =
     { name : Name
     , surname : Surname
+    , id : Id
     }
 
 
-contact : Name -> Surname -> Contact
-contact name_ surname_ =
+contact : Name -> Surname -> Id -> Contact
+contact name_ surname_ id_ =
     { name = name_
     , surname = surname_
+    , id = id_
     }
+
+
+id : Contact -> Id
+id =
+    .id
 
 
 name : Contact -> Name
-name contact_ =
-    contact_.name
+name =
+    .name
 
 
 surname : Contact -> Surname
-surname contact_ =
-    contact_.surname
+surname =
+    .surname
