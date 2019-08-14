@@ -1,22 +1,11 @@
-module Timer exposing (main)
+module Timer exposing (Model, Msg, init, subscriptions, update, view)
 
-import Browser
 import Browser.Events exposing (onAnimationFrame)
 import Html exposing (Html, button, div, input, label, progress, text)
 import Html.Attributes as HA exposing (style, type_, value)
 import Html.Events exposing (onClick, onInput)
 import Task
 import Time exposing (Posix)
-
-
-main : Program () Model Msg
-main =
-    Browser.element
-        { init = init
-        , update = update
-        , view = view
-        , subscriptions = subscriptions
-        }
 
 
 

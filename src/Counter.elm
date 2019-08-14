@@ -1,14 +1,8 @@
-module Counter exposing (main)
+module Counter exposing (Model, Msg, init, update, view)
 
-import Browser
 import Html exposing (Html, button, div, input, text)
 import Html.Attributes exposing (value)
 import Html.Events exposing (onClick)
-
-
-main : Program () Model Msg
-main =
-    Browser.sandbox { init = init, update = update, view = view }
 
 
 

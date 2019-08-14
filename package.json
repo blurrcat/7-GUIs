@@ -4,7 +4,7 @@
   "description": "7 GUIs",
   "scripts": {
     "start": "parcel src/index.html",
-    "build": "parcel build src/index.html"
+    "build": "rm -rf dist && parcel build src/index.html"
   },
   "author": "",
   "license": "ISC",

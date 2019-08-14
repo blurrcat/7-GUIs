@@ -1,14 +1,14 @@
-module TemperatureConverter exposing (main)
+module TemperatureConverter exposing
+    ( Model
+    , Msg
+    , init
+    , update
+    , view
+    )
 
-import Browser
 import Html exposing (Html, div, input, span, text)
 import Html.Attributes exposing (required, step, type_, value)
 import Html.Events exposing (onInput)
-
-
-main : Program () Model Msg
-main =
-    Browser.sandbox { init = init, update = update, view = view }
 
 
 type alias Model =

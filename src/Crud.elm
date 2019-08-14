@@ -1,6 +1,5 @@
-module Crud exposing (main)
+module Crud exposing (Model, Msg, init, update, view)
 
-import Browser
 import Crud.Contact as Contact exposing (Contact, Name, Surname)
 import Crud.Db as Db exposing (DB)
 import Crud.Style as Style
@@ -8,11 +7,6 @@ import Html exposing (Html, button, div, input, label, option, text)
 import Html.Attributes exposing (disabled, multiple, style, value)
 import Html.Events exposing (onClick, onInput)
 import Html.Keyed
-
-
-main : Program () Model Msg
-main =
-    Browser.sandbox { init = init, update = update, view = view }
 
 
 

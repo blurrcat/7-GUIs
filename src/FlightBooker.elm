@@ -1,16 +1,10 @@
-module FlightBooker exposing (main)
+module FlightBooker exposing (Model, Msg, init, update, view)
 
-import Browser
 import Html exposing (Html, button, div, input, option, select, text)
 import Html.Attributes exposing (disabled, selected, style, type_, value)
 import Html.Events exposing (onInput)
 import Iso8601
 import Time
-
-
-main : Program () Model Msg
-main =
-    Browser.sandbox { init = init, update = update, view = view }
 
 
 
