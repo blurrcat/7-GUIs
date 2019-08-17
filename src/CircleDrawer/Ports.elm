@@ -1,34 +1,78 @@
-port module CircleDrawer.Ports exposing (Point, mouseDownOn)
+port module CircleDrawer.Ports exposing
+    ( CircleClick
+    , Click(..)
+    , clickedPoints
+    , selectedCircles
+    )
 
+import CircleDrawer.Point as Point exposing (Point)
 import Json.Decode as D
 import Json.Encode as E
 
 
-port onMouseDownOnSvg : (E.Value -> msg) -> Sub msg
+port clickedPoint : (E.Value -> msg) -> Sub msg
 
 
-type alias Point =
-    ( Float, Float )
+port selectedCircle : (E.Value -> msg) -> Sub msg
 
 
-mouseDownOn : (Maybe Point -> msg) -> Sub msg
-mouseDownOn toMsg =
-    onMouseDownOnSvg (decodePointValue >> toMsg)
+type Click
+    = LeftClick
+    | RightClick
 
 
-point : Float -> Float -> Point
-point =
-    Tuple.pair
+clickDecoder : D.Decoder Click
+clickDecoder =
+    let
+        mapClick click =
+            case click of
+                "left" ->
+                    D.succeed LeftClick
+
+                "right" ->
+                    D.succeed RightClick
+
+                _ ->
+                    D.fail "expected one of ['left', 'right']"
+    in
+    D.string
+        |> D.andThen mapClick
 
 
-pointDecoder : D.Decoder Point
-pointDecoder =
-    D.map2 point
-        (D.field "x" D.float)
-        (D.field "y" D.float)
+type alias CircleClick =
+    { id : String
+    , click : Click
+    }
+
+
+circleClickDecoder : D.Decoder CircleClick
+circleClickDecoder =
+    D.map2 CircleClick
+        (D.field "id" D.string)
+        (D.field "click" clickDecoder)
+
+
+clickedPoints : (Maybe Point -> msg) -> Sub msg
+clickedPoints toMsg =
+    clickedPoint (decodePointValue >> toMsg)
+
+
+selectedCircles : (Maybe CircleClick -> msg) -> Sub msg
+selectedCircles toMsg =
+    selectedCircle (decodeSelectedCircle >> toMsg)
+
+
+decodeValue : D.Decoder a -> E.Value -> Maybe a
+decodeValue decoder value =
+    D.decodeValue decoder value
+        |> Result.toMaybe
 
 
 decodePointValue : E.Value -> Maybe Point
-decodePointValue value =
-    D.decodeValue pointDecoder value
-        |> Result.toMaybe
+decodePointValue =
+    decodeValue Point.decoder
+
+
+decodeSelectedCircle : E.Value -> Maybe CircleClick
+decodeSelectedCircle =
+    decodeValue circleClickDecoder
