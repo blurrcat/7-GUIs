@@ -1,18 +1,18 @@
 module CircleDrawer exposing (Model, Msg, init, subscriptions, update, view)
 
 import CircleDrawer.Circle as Circle exposing (Circle)
+import CircleDrawer.History as History exposing (History)
 import CircleDrawer.Point as Point exposing (Point)
 import CircleDrawer.Ports as Ports
     exposing
         ( CircleClick
-        , Click
         , clickedPoints
         , selectedCircles
         )
 import Html exposing (Html, button, div, input, text)
-import Html.Attributes as HA exposing (style, type_, value)
+import Html.Attributes as HA exposing (disabled, style, type_, value)
 import Html.Events exposing (onClick, onInput)
-import Svg exposing (Svg, circle, rect, svg)
+import Svg exposing (Svg, circle)
 import Svg.Attributes as SA
 import Svg.Keyed
 
@@ -22,10 +22,14 @@ import Svg.Keyed
 
 
 type alias Model =
-    { circles : List Circle
+    { circlesHistory : CirclesHistory
     , selectedCircle : SelectedCircle
     , showEditRadius : Bool
     }
+
+
+type alias CirclesHistory =
+    History (List Circle)
 
 
 type alias SelectedCircle =
@@ -34,7 +38,7 @@ type alias SelectedCircle =
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { circles = []
+    ( { circlesHistory = History.history []
       , selectedCircle = Nothing
       , showEditRadius = False
       }
@@ -51,6 +55,8 @@ type Msg
     | SelectedCircle (Maybe CircleClick)
     | ChangedRadius (Maybe Float)
     | SavedRadius
+    | Undo
+    | Redo
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -68,37 +74,29 @@ update msg model =
         SavedRadius ->
             ( onSavedRadius model, Cmd.none )
 
+        Undo ->
+            ( onUndo model, Cmd.none )
 
-minRadius : Float
-minRadius =
-    2
-
-
-maxRadius : Float
-maxRadius =
-    10
-
-
-defaultCircle : Point -> String -> Circle
-defaultCircle =
-    Circle.circle 5
+        Redo ->
+            ( onRedo model, Cmd.none )
 
 
 onClickedCircle : Maybe Point -> Model -> Model
 onClickedCircle maybePoint model =
     let
         id =
-            model.circles
+            History.current model.circlesHistory
                 |> List.length
                 |> String.fromInt
 
-        circles =
+        createCircle circles =
             maybePoint
-                |> Maybe.map (\p -> model.circles ++ [ defaultCircle p id ])
-                |> Maybe.withDefault model.circles
+                |> Maybe.map (\p -> circles ++ [ defaultCircle p id ])
+                |> Maybe.withDefault circles
     in
     { model
-        | circles = circles
+        | circlesHistory = History.do createCircle model.circlesHistory
+        , selectedCircle = Nothing
     }
 
 
@@ -108,7 +106,8 @@ onSelectedCircle maybeCircleClick model =
         Just click ->
             let
                 selectedCircle =
-                    model.circles
+                    model.circlesHistory
+                        |> History.current
                         |> List.filter (\c -> Circle.id c == click.id)
                         |> List.head
             in
@@ -147,19 +146,48 @@ onSavedRadius model =
             else
                 circle
 
-        circles =
+        updateCircles selectedCircle =
+            List.map (updateCircle selectedCircle)
+
+        circlesHistory =
             case model.selectedCircle of
                 Just selectedCircle ->
-                    model.circles
-                        |> List.map (updateCircle selectedCircle)
+                    model.circlesHistory
+                        |> History.do (updateCircles selectedCircle)
 
                 Nothing ->
-                    model.circles
+                    model.circlesHistory
     in
     { model
-        | circles = circles
+        | circlesHistory = circlesHistory
         , showEditRadius = False
+        , selectedCircle = Nothing
     }
+
+
+onUndo : Model -> Model
+onUndo model =
+    { model | circlesHistory = History.undo model.circlesHistory }
+
+
+onRedo : Model -> Model
+onRedo model =
+    { model | circlesHistory = History.redo model.circlesHistory }
+
+
+minRadius : Float
+minRadius =
+    2
+
+
+maxRadius : Float
+maxRadius =
+    10
+
+
+defaultCircle : Point -> String -> Circle
+defaultCircle =
+    Circle.circle 5
 
 
 circleWithNewRadius : Float -> Circle -> Circle
@@ -172,7 +200,7 @@ circleWithNewRadius radius circle =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions model =
+subscriptions _ =
     Sub.batch
         [ clickedPoints ClickedPoint
         , selectedCircles SelectedCircle
@@ -185,24 +213,36 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
+    let
+        circles =
+            History.current model.circlesHistory
+    in
     div
         [ style "width" "400px"
         , style "height" "400px"
         ]
-        [ buttonsView
-        , canvasView model.selectedCircle model.circles
+        [ buttonsView model.circlesHistory
+        , canvasView model.selectedCircle circles
         , editCircleRadiusView model.showEditRadius model.selectedCircle
         ]
 
 
-buttonsView : Html msg
-buttonsView =
+buttonsView : CirclesHistory -> Html Msg
+buttonsView history =
     div
         [ style "text-align" "center"
         , style "padding" "0.5em"
         ]
-        [ button [] [ text "Undo" ]
-        , button [] [ text "Redo" ]
+        [ button
+            [ onClick Undo
+            , disabled (not (History.canUndo history))
+            ]
+            [ text "Undo" ]
+        , button
+            [ onClick Redo
+            , disabled (not (History.canRedo history))
+            ]
+            [ text "Redo" ]
         ]
 
 
