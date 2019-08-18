@@ -1,6 +1,7 @@
 module Main exposing (main)
 
 import Browser
+import CircleDrawer
 import Counter
 import Crud
 import FlightBooker
@@ -30,22 +31,30 @@ type alias Model =
     , timer : Timer.Model
     , flightBooker : FlightBooker.Model
     , crud : Crud.Model
+    , circleDrawer : CircleDrawer.Model
     }
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
     let
-        ( timer, cmd ) =
+        ( timer, timerCmd ) =
             Timer.init ()
+
+        ( circleDrawer, circleDrawerCmd ) =
+            CircleDrawer.init ()
     in
     ( { counter = Counter.init
       , temperatureConverter = TemperatureConverter.init
       , timer = timer
       , flightBooker = FlightBooker.init
       , crud = Crud.init
+      , circleDrawer = circleDrawer
       }
-    , Cmd.map GotTimerMsg cmd
+    , Cmd.batch
+        [ Cmd.map GotTimerMsg timerCmd
+        , Cmd.map GotCircleDrawerMsg circleDrawerCmd
+        ]
     )
 
 
@@ -54,20 +63,17 @@ init _ =
 
 
 type Msg
-    = Noop
-    | GotCounterMsg Counter.Msg
+    = GotCounterMsg Counter.Msg
     | GotTemperatureConverterMsg TemperatureConverter.Msg
     | GotTimerMsg Timer.Msg
     | GotCrudMsg Crud.Msg
     | GotFlightBookerMsg FlightBooker.Msg
+    | GotCircleDrawerMsg CircleDrawer.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Noop ->
-            ( model, Cmd.none )
-
         GotCounterMsg msg_ ->
             ( { model | counter = Counter.update msg_ model.counter }, Cmd.none )
 
@@ -79,6 +85,13 @@ update msg model =
 
         GotFlightBookerMsg msg_ ->
             ( { model | flightBooker = FlightBooker.update msg_ model.flightBooker }, Cmd.none )
+
+        GotCircleDrawerMsg msg_ ->
+            let
+                ( circleDrawer, cmd ) =
+                    CircleDrawer.update msg_ model.circleDrawer
+            in
+            ( { model | circleDrawer = circleDrawer }, Cmd.map GotCircleDrawerMsg cmd )
 
         GotTimerMsg msg_ ->
             let
@@ -94,7 +107,10 @@ update msg model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.map GotTimerMsg (Timer.subscriptions model.timer)
+    Sub.batch
+        [ Sub.map GotTimerMsg (Timer.subscriptions model.timer)
+        , Sub.map GotCircleDrawerMsg (CircleDrawer.subscriptions model.circleDrawer)
+        ]
 
 
 
@@ -112,6 +128,7 @@ view model =
         , sectionView GotFlightBookerMsg (FlightBooker.view model.flightBooker)
         , sectionView GotTimerMsg (Timer.view model.timer)
         , sectionView GotCrudMsg (Crud.view model.crud)
+        , sectionView GotCircleDrawerMsg (CircleDrawer.view model.circleDrawer)
         ]
 
 
